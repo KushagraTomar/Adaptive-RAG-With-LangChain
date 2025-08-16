@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+langchainhub
+langgraph
+tiktoken
+chromadb
+tavily-python
+langchain-mistralai
+langchain-cohere
+pydantic
+beautifulsoup4
