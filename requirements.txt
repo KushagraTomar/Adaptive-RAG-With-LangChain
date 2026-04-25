@@ -16,3 +16,4 @@ beautifulsoup4
 pypdf
 rank-bm25
 pymupdf4llm 
+langchain-tavily

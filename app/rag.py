@@ -2,13 +2,13 @@ import sys
 from pathlib import Path
 from typing import Any, List, TypedDict
 
-from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.documents import Document
-from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_mistralai import ChatMistralAI
+from langchain_tavily import TavilySearch
 from langgraph.graph import END, START, StateGraph
+from pydantic import BaseModel, Field
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -21,8 +21,7 @@ compression_retriever = retrieval_resources.compression_retriever
 
 mistral_model = "mistral-large-latest"
 llm = ChatMistralAI(model=mistral_model, temperature=0.1)
-tavily_search_tool = TavilySearchResults(max_results=3)
-router_llm = llm.bind_tools([tavily_search_tool])
+tavily_search_tool = TavilySearch(max_results=3)
 
 
 class RAGState(TypedDict, total=False):
@@ -33,33 +32,45 @@ class RAGState(TypedDict, total=False):
     use_web_search: bool      # Whether Tavily web search should be used
 
 
+class RouteDecision(BaseModel):
+    use_web_search: bool = Field(
+        description="Whether web search is needed because retrieved " \
+                    "documents are missing or insufficient."
+    )
+
+
+route_decision_llm = llm.with_structured_output(RouteDecision)
+
+
 def format_docs(docs: List[Any]) -> str:
     return "\n\n".join(doc.page_content for doc in docs)
 
 
 def route_question(state: RAGState) -> RAGState:
-    question = state["question"]
-    response = router_llm.invoke(
-        [
-            SystemMessage(
-                content=(
-                    "You decide whether a question needs Tavily web search. "
-                    "Call the Tavily tool for current events, live facts, recent updates, or questions "
-                    "that are likely not answerable from the local PDF knowledge base. "
-                    "Do not call the tool if the question looks like it should be answered from the indexed documents."
-                )
-            ),
-            HumanMessage(content=question),
-        ]
+    documents = state.get("documents", [])
+    context = state.get("context", "")
+
+    decision = route_decision_llm.invoke(
+        (
+            "You are deciding whether retrieved local documents are sufficient to answer a question. "
+            "Choose web search only when the retrieved context does not contain the answer , "
+            "or the question requires recent or live information not likely to exist in static PDFs. "
+            "Prefer local documents when they appear relevant enough to answer.\n\n"
+            f"Question: {state['question']}\n\n"
+            f"Retrieved context:\n{context}"
+        )
     )
 
-    use_web_search = bool(response.tool_calls)
-    print(f"Routing question to {'web search' if use_web_search else 'local retrieval'}.")
-    return {"use_web_search": use_web_search}
+    print(
+        f"Routing question to {'web search' if decision.use_web_search else 'local retrieval'}: "
+    )
+    return {
+        "use_web_search": decision.use_web_search,
+    }
 
 
 def route_after_decision(state: RAGState) -> str:
-    return "web_search" if state.get("use_web_search", False) else "retrieve_documents"
+    return "use_web_search" if state.get("use_web_search", False) else "use_local_retrieval"
 
 
 def retrieve_documents(state: RAGState) -> RAGState:
@@ -80,6 +91,7 @@ def retrieve_documents(state: RAGState) -> RAGState:
 def web_search(state: RAGState) -> RAGState:
     question = state["question"]
     results = tavily_search_tool.invoke({"query": question})
+    search_results = results.get("results", [])
 
     web_documents = [
         Document(
@@ -94,7 +106,7 @@ def web_search(state: RAGState) -> RAGState:
                 "type": "web_search",
             },
         )
-        for item in results
+        for item in search_results
     ]
 
     print(f"Tavily returned {len(web_documents)} web results.")
@@ -138,16 +150,16 @@ graph_builder.add_node("route_question", route_question)
 graph_builder.add_node("retrieve_documents", retrieve_documents)
 graph_builder.add_node("web_search", web_search)
 graph_builder.add_node("generate_answer", generate_answer)
-graph_builder.add_edge(START, "route_question")
+graph_builder.add_edge(START, "retrieve_documents")
+graph_builder.add_edge("retrieve_documents", "route_question")
 graph_builder.add_conditional_edges(
     "route_question",
     route_after_decision,
     {
-        "retrieve_documents": "retrieve_documents",
-        "web_search": "web_search",
+        "use_local_retrieval": "generate_answer",
+        "use_web_search": "web_search",
     },
 )
-graph_builder.add_edge("retrieve_documents", "generate_answer")
 graph_builder.add_edge("web_search", "generate_answer")
 graph_builder.add_edge("generate_answer", END)
 rag_workflow = graph_builder.compile()
@@ -159,7 +171,7 @@ def answer_question(question: str) -> str:
     return result["answer"]
 
 if __name__ == "__main__":
-    user_question = "explain the encoder and decoder stacks"
+    user_question = "where is india in world map?"
     answer = answer_question(user_question)
     print("\nAnswer:\n")
     print(answer)
