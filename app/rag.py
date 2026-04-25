@@ -8,9 +8,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_mistralai import ChatMistralAI
 from langgraph.graph import END, START, StateGraph
 
-if __package__ is None or __package__ == "":
-    sys.path.append(str(Path(__file__).resolve().parent.parent))
-
 from app.ingestion import build_retrieval_resources
 
 
