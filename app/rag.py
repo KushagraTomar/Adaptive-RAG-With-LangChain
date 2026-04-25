@@ -121,14 +121,14 @@ hybrid_retrieve = EnsembleRetriever(
 
 reranker = CohereRerank(
     model="rerank-english-v3.0",
-    top_n=3,          # return only top 3 after reranking
+    top_n=2,          # return only top 2 after reranking
     cohere_api_key=os.getenv("COHERE_API_KEY")
 )
 
 # Wrap your existing retriever — interface stays identical
 compression_retriever = ContextualCompressionRetriever(
     base_compressor=reranker,
-    base_retriever=hybrid_retrieve  # fetches k=4, reranker picks best 3
+    base_retriever=hybrid_retrieve  # fetches k=4, reranker picks best 2
 )
 
 mistral_model = "mistral-large-latest"
@@ -158,7 +158,9 @@ def answer_question(question: str) -> str:
     # The retriever embeds the user question internally before similarity search in Pinecone.
     # documents = retriever.invoke(question)
     documents = compression_retriever.invoke(question)
-    print(documents)
+    for i, doc in enumerate(documents):
+        print(f"\nDocument {i+1}:\n")
+        print(doc.page_content[:150])
 
     print(f"Retrieved {len(documents)} documents.")
 
