@@ -23,6 +23,15 @@ pip install -r requirements.txt
 export MISTRAL_API_KEY="your-mistral-api-key"
 export COHERE_API_KEY="your-cohere-api-key"
 export TAVILY_API_KEY="your-tavily-api-key"
+export PINECONE_API_KEY="your-pinecone-api-key"
+export PINECONE_INDEX_NAME="adaptive-rag"
+export PINECONE_CLOUD="aws"
+export PINECONE_REGION="us-east-1"
+```
+
+Optional:
+```bash
+export PINECONE_NAMESPACE="default"
 ```
 
 3. Run the FastAPI server:

@@ -1,0 +1,8 @@
+django
+fast-api
+rag
+python
+vectordb
+llm
+langchain
+pinecone
