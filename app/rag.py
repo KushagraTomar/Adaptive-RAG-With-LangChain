@@ -22,10 +22,10 @@ llm = ChatMistralAI(model=mistral_model, temperature=0.1)
 
 
 class RAGState(TypedDict, total=False):
-    question: str
-    documents: List[Document]
-    context: str
-    answer: str
+    question: str             # User's question
+    documents: List[Document] # Retrieved documents
+    context: str              # Formatted context from retrieved documents
+    answer: str               # Generated answer to the question
 
 
 def format_docs(docs: List[Any]) -> str:
@@ -37,9 +37,9 @@ def retrieve_documents(state: RAGState) -> RAGState:
     documents = compression_retriever.invoke(question)
 
     print(f"Retrieved {len(documents)} documents.")
-    for i, doc in enumerate(documents, start=1):
-        print(f"\nDocument {i}:")
-        print(doc.page_content[:150])
+    # for i, doc in enumerate(documents, start=1):
+    #     print(f"\nDocument {i}:")
+    #     print(doc.page_content[:150])
 
     return {
         "documents": documents,
@@ -66,10 +66,11 @@ rag_chain = generation_prompt | llm | StrOutputParser()
 
 
 def generate_answer(state: RAGState) -> RAGState:
+    context = state.get("context", "")
     answer = rag_chain.invoke(
         {
             "question": state["question"],
-            "context": state["context"],
+            "context": context,
         }
     )
     return {"answer": answer}
@@ -85,13 +86,9 @@ rag_workflow = graph_builder.compile()
 
 
 def answer_question(question: str) -> str:
-    result = rag_workflow.invoke({"question": question})
+    state: RAGState = {"question": question}
+    result = rag_workflow.invoke(state)
     return result["answer"]
-
-
-def get_answer(question: str) -> str:
-    return answer_question(question)
-
 
 if __name__ == "__main__":
     user_question = "explain the encoder and decoder stacks"
