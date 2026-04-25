@@ -2,10 +2,11 @@ import hashlib
 import os
 import re
 from typing import List, Dict, Any
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import pymupdf4llm
+from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_community.retrievers import BM25Retriever
-from langchain_classic.retrievers import EnsembleRetriever
+from langchain_classic.retrievers import EnsembleRetriever, ContextualCompressionRetriever
 from langchain_mistralai import MistralAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain_core.documents import Document
@@ -13,6 +14,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_mistralai import ChatMistralAI
 from langchain_core.output_parsers import StrOutputParser
 from pinecone import Pinecone, ServerlessSpec
+
+from langchain_cohere import CohereRerank
+# from langchain.retrievers import ContextualCompressionRetriever
 
 # Set up embeddings
 embd = MistralAIEmbeddings()
@@ -35,11 +39,6 @@ print(f"Loaded {len(docs_list)} documents from {pdf_dir}")
 # for i, doc in enumerate(split_docs[:20]):
 #     print(f"\nChunk {i+1}:\n")
 #     print(doc.page_content)
-
-import pymupdf4llm
-from langchain_text_splitters import MarkdownHeaderTextSplitter
-from langchain_core.documents import Document
-import os
 
 doc_splits = []
 for filename in os.listdir("pdfs/"):
@@ -111,13 +110,25 @@ vectorstore.add_documents(documents=doc_splits, ids=doc_ids)
 # retriever = vectorstore.as_retriever()
 
 # Build dense + BM25 retrievers for hybrid search.
-dense_retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+dense_retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
 bm25_retriever = BM25Retriever.from_documents(doc_splits)
-bm25_retriever.k = 2
+bm25_retriever.k = 4
 
 hybrid_retrieve = EnsembleRetriever(
     retrievers=[bm25_retriever, dense_retriever],
     weights=[0.4, 0.6],
+)
+
+reranker = CohereRerank(
+    model="rerank-english-v3.0",
+    top_n=3,          # return only top 3 after reranking
+    cohere_api_key=os.getenv("COHERE_API_KEY")
+)
+
+# Wrap your existing retriever — interface stays identical
+compression_retriever = ContextualCompressionRetriever(
+    base_compressor=reranker,
+    base_retriever=hybrid_retrieve  # fetches k=4, reranker picks best 3
 )
 
 mistral_model = "mistral-large-latest"
@@ -146,7 +157,8 @@ rag_chain = generation_prompt | llm | StrOutputParser()
 def answer_question(question: str) -> str:
     # The retriever embeds the user question internally before similarity search in Pinecone.
     # documents = retriever.invoke(question)
-    documents = hybrid_retrieve.invoke(question)
+    documents = compression_retriever.invoke(question)
+    print(documents)
 
     print(f"Retrieved {len(documents)} documents.")
 

@@ -6,3 +6,5 @@ vectordb
 llm
 langchain
 pinecone
+BM25 dense reterver
+reranker cohere
