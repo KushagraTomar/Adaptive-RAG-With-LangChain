@@ -34,7 +34,12 @@ Optional:
 export PINECONE_NAMESPACE="default"
 ```
 
-3. Run the FastAPI server:
+3. Run the ingestion pipeline to chunk PDFs and index them in Pinecone:
+```bash
+python -m app.ingestion
+```
+
+4. Run the FastAPI server:
 ```bash
 uvicorn app.main:app --reload
 ```

@@ -5,6 +5,7 @@ python
 vectordb
 llm
 langchain
+langgraph
 pinecone
 BM25 dense reterver
 reranker cohere
