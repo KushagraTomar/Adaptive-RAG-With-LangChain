@@ -31,7 +31,7 @@ def get_doc_id(doc: Document) -> str:
 
 
 def load_and_chunk_documents(pdf_dir: str | None = None) -> List[Document]:
-    resolved_pdf_dir = pdf_dir or os.getenv("PDF_DIR", "pdfs")
+    pdf_dir = pdf_dir or os.getenv("PDF_DIR", "pdfs")
     doc_splits: List[Document] = []
 
     headers_to_split_on = [
@@ -39,25 +39,25 @@ def load_and_chunk_documents(pdf_dir: str | None = None) -> List[Document]:
         ("##", "Header 2"),
         ("###", "Header 3"),
     ]
-    splitter = MarkdownHeaderTextSplitter(
+    md_splitter = MarkdownHeaderTextSplitter(
         headers_to_split_on=headers_to_split_on,
         strip_headers=False,
     )
 
-    for filename in os.listdir(resolved_pdf_dir):
+    for filename in os.listdir(pdf_dir):
         if not filename.endswith(".pdf"):
             continue
 
-        pdf_path = os.path.join(resolved_pdf_dir, filename)
+        pdf_path = os.path.join(pdf_dir, filename)
         md_text = pymupdf4llm.to_markdown(pdf_path)
-        chunks = splitter.split_text(md_text)
+        chunks = md_splitter.split_text(md_text)
 
         for chunk in chunks:
             chunk.metadata.setdefault("source", pdf_path)
 
         doc_splits.extend(chunks)
 
-    print(f"Split into {len(doc_splits)} chunks from {resolved_pdf_dir}.")
+    print(f"Split into {len(doc_splits)} chunks from {pdf_dir}.")
     return doc_splits
 
 
@@ -110,8 +110,8 @@ def index_documents(
 
 
 def build_retrieval_resources(
-    dense_k: int = 4,
-    bm25_k: int = 4,
+    dense_k: int = 3,
+    bm25_k: int = 3,
     rerank_top_n: int = 2,
 ) -> RetrievalResources:
     embedding = get_embeddings()
