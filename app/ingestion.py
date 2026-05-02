@@ -14,7 +14,6 @@ from langchain_text_splitters import MarkdownHeaderTextSplitter
 from pinecone import Pinecone, ServerlessSpec
 
 
-@dataclass
 class RetrievalResources:
     doc_splits: List[Document]
     vectorstore: PineconeVectorStore
@@ -22,6 +21,14 @@ class RetrievalResources:
     bm25_retriever: BM25Retriever
     hybrid_retriever: EnsembleRetriever
     compression_retriever: ContextualCompressionRetriever
+
+    def __init__(self, doc_splits, vectorstore, dense_retriever, bm25_retriever, hybrid_retriever, compression_retriever):
+        self.doc_splits = doc_splits
+        self.vectorstore = vectorstore
+        self.dense_retriever = dense_retriever
+        self.bm25_retriever = bm25_retriever
+        self.hybrid_retriever = hybrid_retriever
+        self.compression_retriever = compression_retriever
 
 
 def get_doc_id(doc: Document) -> str:
@@ -35,9 +42,9 @@ def load_and_chunk_documents(pdf_dir: str | None = None) -> List[Document]:
     doc_splits: List[Document] = []
 
     headers_to_split_on = [
-        ("#", "Header 1"),
-        ("##", "Header 2"),
-        ("###", "Header 3"),
+        ("#", "title"),
+        ("##", "title"),
+        ("###", "title"),
     ]
     md_splitter = MarkdownHeaderTextSplitter(
         headers_to_split_on=headers_to_split_on,
@@ -54,6 +61,7 @@ def load_and_chunk_documents(pdf_dir: str | None = None) -> List[Document]:
 
         for chunk in chunks:
             chunk.metadata.setdefault("source", pdf_path)
+            chunk.metadata.setdefault("type", "local_pdf")
 
         doc_splits.extend(chunks)
 

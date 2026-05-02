@@ -25,29 +25,113 @@ tavily_search_tool = TavilySearch(max_results=2)
 
 
 class RAGState(TypedDict, total=False):
-    question: str             # User's question
-    documents: List[Document] # Retrieved documents
-    context: str              # Formatted context from retrieved documents
-    answer: str               # Generated answer to the question
-    use_web_search: bool      # Whether Tavily web search should be used
+    question: str              # User's question
+    documents: List[Document]  # Retrieved documents
+    context: str               # Formatted context from retrieved documents
+    answer: str                # Generated answer to the question
+    relevance_score: float     # Score indicating document relevance
+    is_relevant: bool          # Whether documents are relevant to question
+    rewrite_count: int         # Number of query rewrites
+    max_rewrites: int          # Maximum allowed rewrites
 
-
+# pydantic model defining output schema for the routing decision LLM
 class RouteDecision(BaseModel):
     use_web_search: bool = Field(
         description="Whether web search is needed because retrieved " \
-                    "documents are missing or insufficient."
+                    "documents are missing or insufficient to answer the user query."
     )
 
 
 route_decision_llm = llm.with_structured_output(RouteDecision)
 
+class GradeDocuments(BaseModel):
+    binary_score: str = Field(
+        description="Documents are relevant to the question, 'yes' or 'no'"
+    )
+
+
+grade_llm = llm.with_structured_output(GradeDocuments)
 
 def format_docs(docs: List[Any]) -> str:
     return "\n\n".join(doc.page_content for doc in docs)
 
 
-def route_question(state: RAGState) -> RAGState:
+def grade_documents(state: RAGState) -> RAGState:
+    """Grade whether retrieved documents are relevant to the question"""
+    question = state["question"]
     documents = state.get("documents", [])
+    context = state.get("context", "")
+    
+    if not documents:
+        print("No documents retrieved. Marking as not relevant.")
+        return {"is_relevant": False}
+    
+    grade_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are grading whether retrieved documents are relevant to the user's question. "
+                "Consider documents relevant if they contain information that directly addresses the question.",
+            ),
+            (
+                "human",
+                "Question: {question}\n\nDocuments:\n{context}\n\nAre these documents relevant?",
+            ),
+        ]
+    )
+    
+    grade_chain = grade_prompt | grade_llm
+    result = grade_chain.invoke({"question": question, "context": context})
+    
+    is_relevant = result.binary_score.lower() == "yes"
+    print(f"Grade documents: {'relevant' if is_relevant else 'not relevant'}")
+    
+    return {"is_relevant": is_relevant}
+
+
+def decide_relevance(state: RAGState) -> str:
+    """Decide whether to generate answer or rewrite query"""
+    if state.get("is_relevant", False):
+        return "generate_answer"
+    else:
+        return "rewrite_query"
+
+
+def rewrite_query(state: RAGState) -> RAGState:
+    """Rewrite the query if documents are not relevant"""
+    original_question = state["question"]
+    rewrite_count = state.get("rewrite_count", 0)
+    max_rewrites = state.get("max_rewrites", 2)
+    
+    if rewrite_count >= max_rewrites:
+        print(f"Max rewrites ({max_rewrites}) reached. Generating answer with available documents.")
+        return {"rewrite_count": rewrite_count}
+    
+    rewrite_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "Rewrite the question to be more specific and searchable. Return only the rewritten question, no explanation.",
+            ),
+            (
+                "human",
+                "{question}",
+            ),
+        ]
+    )
+    
+    rewrite_chain = rewrite_prompt | llm | StrOutputParser()
+    rewritten_question = rewrite_chain.invoke({"question": original_question}).strip()
+    
+    print(f"Rewrite #{rewrite_count + 1}: '{original_question[:50]}...' → '{rewritten_question[:50]}...'")
+    
+    return {
+        "question": rewritten_question,
+        "rewrite_count": rewrite_count + 1,
+    }
+
+
+def route_question(state: RAGState) -> RAGState:
     context = state.get("context", "")
 
     decision = route_decision_llm.invoke(
@@ -77,10 +161,10 @@ def retrieve_documents(state: RAGState) -> RAGState:
     question = state["question"]
     documents = compression_retriever.invoke(question)
 
+    print("Retrieved documents:")
+    print(documents[0])
+
     print(f"Retrieved {len(documents)} documents.")
-    # for i, doc in enumerate(documents, start=1):
-    #     print(f"\nDocument {i}:")
-    #     print(doc.page_content[:150])
 
     return {
         "documents": documents,
@@ -94,6 +178,7 @@ def web_search(state: RAGState) -> RAGState:
     search_results = results.get("results", [])
 
     web_documents = [
+        # create langchain Document object
         Document(
             page_content=(
                 f"Title: {item.get('title', 'Untitled')}\n"
@@ -146,32 +231,38 @@ def generate_answer(state: RAGState) -> RAGState:
 
 
 graph_builder = StateGraph(RAGState)
-graph_builder.add_node("route_question", route_question)
 graph_builder.add_node("retrieve_documents", retrieve_documents)
-graph_builder.add_node("web_search", web_search)
+graph_builder.add_node("grade_documents", grade_documents)
+graph_builder.add_node("rewrite_query", rewrite_query)
 graph_builder.add_node("generate_answer", generate_answer)
+
+# Add edges for self-reflective RAG
 graph_builder.add_edge(START, "retrieve_documents")
-graph_builder.add_edge("retrieve_documents", "route_question")
+graph_builder.add_edge("retrieve_documents", "grade_documents")
 graph_builder.add_conditional_edges(
-    "route_question",
-    route_after_decision,
+    "grade_documents",
+    decide_relevance,
     {
-        "use_local_retrieval": "generate_answer",
-        "use_web_search": "web_search",
+        "generate_answer": "generate_answer",
+        "rewrite_query": "rewrite_query",
     },
 )
-graph_builder.add_edge("web_search", "generate_answer")
+graph_builder.add_edge("rewrite_query", "retrieve_documents")
 graph_builder.add_edge("generate_answer", END)
 rag_workflow = graph_builder.compile()
 
 
 def answer_question(question: str) -> str:
-    state: RAGState = {"question": question}
+    state: RAGState = {
+        "question": question,
+        "rewrite_count": 0,
+        "max_rewrites": 2,
+    }
     result = rag_workflow.invoke(state)
     return result["answer"]
 
 if __name__ == "__main__":
-    user_question = "who is pm of india?"
+    user_question = "What is the transformer architecture?"
     answer = answer_question(user_question)
     print("\nAnswer:\n")
     print(answer)
