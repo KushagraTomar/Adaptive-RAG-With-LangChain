@@ -21,7 +21,7 @@ compression_retriever = retrieval_resources.compression_retriever
 
 mistral_model = "mistral-large-latest"
 llm = ChatMistralAI(model=mistral_model, temperature=0.1)
-tavily_search_tool = TavilySearch(max_results=3)
+tavily_search_tool = TavilySearch(max_results=2)
 
 
 class RAGState(TypedDict, total=False):
@@ -171,7 +171,7 @@ def answer_question(question: str) -> str:
     return result["answer"]
 
 if __name__ == "__main__":
-    user_question = "where is india in world map?"
+    user_question = "who is pm of india?"
     answer = answer_question(user_question)
     print("\nAnswer:\n")
     print(answer)
