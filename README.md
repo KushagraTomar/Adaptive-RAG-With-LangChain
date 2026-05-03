@@ -11,6 +11,11 @@ This project implements an Adaptive Retrieval-Augmented Generation (RAG) system 
 - Answer quality assessment
 - Question rewriting for better retrieval
 
+## Run
+```bash
+uvicorn app.api.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
 ## Setup
 
 1. Install the required packages:
