@@ -1,10 +1,8 @@
 import hashlib
-import os
 from dataclasses import dataclass
 from typing import List
 
 import pymupdf4llm
-from langchain_classic.retrievers import ContextualCompressionRetriever, EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
 from langchain_cohere import CohereRerank
 from langchain_core.documents import Document
@@ -13,32 +11,34 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from pinecone import Pinecone, ServerlessSpec
 
+from config.settings import (
+    PDF_DIR, PINECONE_API_KEY, PINECONE_INDEX_NAME, PINECONE_NAMESPACE,
+    PINECONE_CLOUD, PINECONE_REGION, DENSE_RETRIEVER_K, BM25_RETRIEVER_K,
+    RERANK_TOP_N, COHERE_API_KEY, COHERE_RERANK_MODEL
+)
 
+
+@dataclass
 class RetrievalResources:
+    """Container for retrieval resources"""
     doc_splits: List[Document]
     vectorstore: PineconeVectorStore
     dense_retriever: object
     bm25_retriever: BM25Retriever
-    hybrid_retriever: EnsembleRetriever
-    compression_retriever: ContextualCompressionRetriever
-
-    def __init__(self, doc_splits, vectorstore, dense_retriever, bm25_retriever, hybrid_retriever, compression_retriever):
-        self.doc_splits = doc_splits
-        self.vectorstore = vectorstore
-        self.dense_retriever = dense_retriever
-        self.bm25_retriever = bm25_retriever
-        self.hybrid_retriever = hybrid_retriever
-        self.compression_retriever = compression_retriever
+    hybrid_retriever: object
+    compression_retriever: object
 
 
 def get_doc_id(doc: Document) -> str:
+    """Generate unique ID for document"""
     return hashlib.sha256(
         f"{doc.metadata.get('source', '')}:{doc.metadata.get('page', '')}:{doc.page_content}".encode("utf-8")
     ).hexdigest()
 
 
 def load_and_chunk_documents(pdf_dir: str | None = None) -> List[Document]:
-    pdf_dir = pdf_dir or os.getenv("PDF_DIR", "pdfs")
+    """Load PDFs and chunk them"""
+    pdf_dir = pdf_dir or str(PDF_DIR)
     doc_splits: List[Document] = []
 
     headers_to_split_on = [
@@ -51,17 +51,17 @@ def load_and_chunk_documents(pdf_dir: str | None = None) -> List[Document]:
         strip_headers=False,
     )
 
-    for filename in os.listdir(pdf_dir):
+    for filename in __import__('os').listdir(pdf_dir):
         if not filename.endswith(".pdf"):
             continue
 
-        pdf_path = os.path.join(pdf_dir, filename)
+        pdf_path = __import__('os').path.join(pdf_dir, filename)
         md_text = pymupdf4llm.to_markdown(pdf_path)
         chunks = md_splitter.split_text(md_text)
 
         for chunk in chunks:
             chunk.metadata.setdefault("source", pdf_path)
-            chunk.metadata.setdefault("type", "local_pdf")
+            chunk.metadata.setdefault("type", "local pdf")
 
         doc_splits.extend(chunks)
 
@@ -70,41 +70,37 @@ def load_and_chunk_documents(pdf_dir: str | None = None) -> List[Document]:
 
 
 def get_embeddings() -> MistralAIEmbeddings:
+    """Get Mistral embeddings model"""
     return MistralAIEmbeddings()
 
 
 def get_pinecone_vectorstore(embedding: MistralAIEmbeddings) -> PineconeVectorStore:
-    pinecone_api_key = os.getenv("PINECONE_API_KEY")
-    pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "adaptive-rag")
-    pinecone_namespace = os.getenv("PINECONE_NAMESPACE", "default")
-    pinecone_cloud = os.getenv("PINECONE_CLOUD", "aws")
-    pinecone_region = os.getenv("PINECONE_REGION", "us-east-1")
-
-    if not pinecone_api_key:
+    """Initialize Pinecone vectorstore"""
+    if not PINECONE_API_KEY:
         raise ValueError("PINECONE_API_KEY environment variable is required.")
 
-    pc = Pinecone(api_key=pinecone_api_key)
+    pc = Pinecone(api_key=PINECONE_API_KEY)
 
-    if not pc.has_index(pinecone_index_name):
+    if not pc.has_index(PINECONE_INDEX_NAME):
         pc.create_index(
-            name=pinecone_index_name,
+            name=PINECONE_INDEX_NAME,
             vector_type="dense",
             dimension=1024,
             metric="cosine",
             spec=ServerlessSpec(
-                cloud=pinecone_cloud,
-                region=pinecone_region,
+                cloud=PINECONE_CLOUD,
+                region=PINECONE_REGION,
             ),
         )
-        print(f"Created Pinecone index '{pinecone_index_name}'.")
+        print(f"Created Pinecone index '{PINECONE_INDEX_NAME}'.")
     else:
-        print(f"Pinecone index '{pinecone_index_name}' already exists.")
+        print(f"Pinecone index '{PINECONE_INDEX_NAME}' already exists.")
 
-    index = pc.Index(pinecone_index_name)
+    index = pc.Index(PINECONE_INDEX_NAME)
     return PineconeVectorStore(
         index=index,
         embedding=embedding,
-        namespace=pinecone_namespace,
+        namespace=PINECONE_NAMESPACE,
     )
 
 
@@ -112,16 +108,20 @@ def index_documents(
     documents: List[Document],
     vectorstore: PineconeVectorStore,
 ) -> None:
+    """Index documents into vectorstore"""
     doc_ids = [get_doc_id(doc) for doc in documents]
     vectorstore.add_documents(documents=documents, ids=doc_ids)
     print(f"Indexed {len(documents)} chunks into Pinecone.")
 
 
 def build_retrieval_resources(
-    dense_k: int = 3,
-    bm25_k: int = 3,
-    rerank_top_n: int = 2,
+    dense_k: int = DENSE_RETRIEVER_K,
+    bm25_k: int = BM25_RETRIEVER_K,
+    rerank_top_n: int = RERANK_TOP_N,
 ) -> RetrievalResources:
+    """Build retrieval resources with hybrid retriever"""
+    from langchain_classic.retrievers import ContextualCompressionRetriever, EnsembleRetriever
+    
     embedding = get_embeddings()
     doc_splits = load_and_chunk_documents()
     vectorstore = get_pinecone_vectorstore(embedding)
@@ -136,9 +136,9 @@ def build_retrieval_resources(
     )
 
     reranker = CohereRerank(
-        model="rerank-english-v3.0",
+        model=COHERE_RERANK_MODEL,
         top_n=rerank_top_n,
-        cohere_api_key=os.getenv("COHERE_API_KEY"),
+        cohere_api_key=COHERE_API_KEY,
     )
 
     compression_retriever = ContextualCompressionRetriever(
@@ -157,6 +157,7 @@ def build_retrieval_resources(
 
 
 def run_ingestion_pipeline() -> None:
+    """Run complete ingestion pipeline"""
     embedding = get_embeddings()
     doc_splits = load_and_chunk_documents()
     vectorstore = get_pinecone_vectorstore(embedding)
