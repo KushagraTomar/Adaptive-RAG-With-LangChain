@@ -25,14 +25,12 @@ tavily_search_tool = TavilySearch(max_results=2)
 
 
 class RAGState(TypedDict, total=False):
-    question: str              # User's question
-    documents: List[Document]  # Retrieved documents
-    context: str               # Formatted context from retrieved documents
-    answer: str                # Generated answer to the question
-    relevance_score: float     # Score indicating document relevance
-    is_relevant: bool          # Whether documents are relevant to question
-    rewrite_count: int         # Number of query rewrites
-    max_rewrites: int          # Maximum allowed rewrites
+    question: str                        # User's question
+    documents: List[Document]            # Retrieved documents
+    context: str                         # Formatted context from retrieved documents
+    answer: str                          # Generated answer to the question
+    is_relevant: bool                    # Whether documents are relevant to question  
+    transformed_query: str               # Query after transformation
 
 # pydantic model defining output schema for the routing decision LLM
 class RouteDecision(BaseModel):
@@ -90,28 +88,23 @@ def grade_documents(state: RAGState) -> RAGState:
 
 
 def decide_relevance(state: RAGState) -> str:
-    """Decide whether to generate answer or rewrite query"""
+    """Decide whether to generate answer or transform query for web search"""
     if state.get("is_relevant", False):
-        return "generate_answer"
+        return "generate"
     else:
-        return "rewrite_query"
+        return "transform_query"
 
 
-def rewrite_query(state: RAGState) -> RAGState:
-    """Rewrite the query if documents are not relevant"""
+def transform_query(state: RAGState) -> RAGState:
+    """Transform the query to optimize for web search"""
     original_question = state["question"]
-    rewrite_count = state.get("rewrite_count", 0)
-    max_rewrites = state.get("max_rewrites", 2)
     
-    if rewrite_count >= max_rewrites:
-        print(f"Max rewrites ({max_rewrites}) reached. Generating answer with available documents.")
-        return {"rewrite_count": rewrite_count}
-    
-    rewrite_prompt = ChatPromptTemplate.from_messages(
+    transform_prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                "Rewrite the question to be more specific and searchable. Return only the rewritten question, no explanation.",
+                "Transform the user's question into a concise search query optimized for web search. "
+                "Return only the transformed query, no explanation.",
             ),
             (
                 "human",
@@ -120,14 +113,43 @@ def rewrite_query(state: RAGState) -> RAGState:
         ]
     )
     
-    rewrite_chain = rewrite_prompt | llm | StrOutputParser()
-    rewritten_question = rewrite_chain.invoke({"question": original_question}).strip()
+    transform_chain = transform_prompt | llm | StrOutputParser()
+    transformed = transform_chain.invoke({"question": original_question}).strip()
     
-    print(f"Rewrite #{rewrite_count + 1}: '{original_question[:50]}...' → '{rewritten_question[:50]}...'")
+    print(f"Transform query: '{original_question[:50]}...' → '{transformed[:50]}...'")
+    
+    return {"transformed_query": transformed}
+
+
+def web_search_node(state: RAGState) -> RAGState:
+    """Perform web search using transformed query"""
+    query = state.get("transformed_query", state["question"])
+    
+    print(f"Searching web for: '{query}'")
+    results = tavily_search_tool.invoke({"query": query})
+    search_results = results.get("results", [])
+    
+    web_documents = [
+        Document(
+            page_content=(
+                f"Title: {item.get('title', 'Untitled')}\n"
+                f"URL: {item.get('url', '')}\n"
+                f"Content: {item.get('content', '')}"
+            ),
+            metadata={
+                "source": item.get("url", ""),
+                "title": item.get("title", ""),
+                "type": "web_search",
+            },
+        )
+        for item in search_results
+    ]
+    
+    print(f"Web search returned {len(web_documents)} results.")
     
     return {
-        "question": rewritten_question,
-        "rewrite_count": rewrite_count + 1,
+        "documents": web_documents,
+        "context": format_docs(web_documents),
     }
 
 
@@ -201,25 +223,24 @@ def web_search(state: RAGState) -> RAGState:
     }
 
 
-generation_prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            "You are a helpful assistant for question answering. "
-            "Use only the retrieved context to answer the question. "
-            "If the answer is not in the context, say you could not find it in the documents.",
-        ),
-        (
-            "human",
-            "Question: {question}\n\nRetrieved context:\n{context}",
-        ),
-    ]
-)
-
-rag_chain = generation_prompt | llm | StrOutputParser()
-
-
 def generate_answer(state: RAGState) -> RAGState:
+    generation_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are a helpful assistant for question answering. "
+                "Use only the retrieved context to answer the question. "
+                "If the answer is not in the context, say you could not find it in the documents.",
+            ),
+            (
+                "human",
+                "Question: {question}\n\nRetrieved context:\n{context}",
+            ),
+        ]
+    )
+
+    rag_chain = generation_prompt | llm | StrOutputParser()
+
     context = state.get("context", "")
     answer = rag_chain.invoke(
         {
@@ -230,39 +251,38 @@ def generate_answer(state: RAGState) -> RAGState:
     return {"answer": answer}
 
 
+# Build graph following the architecture from the image
 graph_builder = StateGraph(RAGState)
 graph_builder.add_node("retrieve_documents", retrieve_documents)
 graph_builder.add_node("grade_documents", grade_documents)
-graph_builder.add_node("rewrite_query", rewrite_query)
-graph_builder.add_node("generate_answer", generate_answer)
+graph_builder.add_node("transform_query", transform_query)
+graph_builder.add_node("web_search", web_search_node)
+graph_builder.add_node("generate", generate_answer)
 
-# Add edges for self-reflective RAG
+# Add edges for self-corrective RAG
 graph_builder.add_edge(START, "retrieve_documents")
 graph_builder.add_edge("retrieve_documents", "grade_documents")
 graph_builder.add_conditional_edges(
     "grade_documents",
     decide_relevance,
     {
-        "generate_answer": "generate_answer",
-        "rewrite_query": "rewrite_query",
+        "generate": "generate",
+        "transform_query": "transform_query",
     },
 )
-graph_builder.add_edge("rewrite_query", "retrieve_documents")
-graph_builder.add_edge("generate_answer", END)
+graph_builder.add_edge("transform_query", "web_search")
+graph_builder.add_edge("web_search", "generate")
+graph_builder.add_edge("generate", END)
 rag_workflow = graph_builder.compile()
 
 
 def answer_question(question: str) -> str:
-    state: RAGState = {
-        "question": question,
-        "rewrite_count": 0,
-        "max_rewrites": 2,
-    }
+    state: RAGState = {"question": question}
     result = rag_workflow.invoke(state)
     return result["answer"]
 
 if __name__ == "__main__":
-    user_question = "What is the transformer architecture?"
+    user_question = "what is el nina?"
     answer = answer_question(user_question)
     print("\nAnswer:\n")
     print(answer)
