@@ -16,6 +16,11 @@ This project implements an Adaptive Retrieval-Augmented Generation (RAG) system 
 uvicorn app.api.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
+```bash
+cd frontend
+npm run dev
+```
+
 ## Setup
 
 1. Install the required packages:
@@ -67,3 +72,16 @@ uvicorn app.main:app --reload
   "answer": "The types of agent memory include...",
   "question": "What are the types of agent memory?"
 }
+
+## Technology Used
+
+1.python
+2.fast-api
+3.rag
+4.pinecone vectordb
+5.llm
+6.langchain
+7.langgraph
+8.hybrid reterver
+9.cohere reranker
+10.reactjs
