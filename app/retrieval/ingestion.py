@@ -156,6 +156,37 @@ def build_retrieval_resources(
     )
 
 
+def ingest_pdf(pdf_path: str) -> None:
+    """Ingest a single PDF file into the vectorstore"""
+    import os
+    
+    # Parse single PDF
+    md_text = pymupdf4llm.to_markdown(pdf_path)
+    
+    headers_to_split_on = [
+        ("#", "title"),
+        ("##", "title"),
+        ("###", "title"),
+    ]
+    md_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=headers_to_split_on,
+        strip_headers=False,
+    )
+    
+    doc_splits = md_splitter.split_text(md_text)
+    
+    for chunk in doc_splits:
+        chunk.metadata.setdefault("source", pdf_path)
+        chunk.metadata.setdefault("type", "uploaded pdf")
+    
+    # Index documents
+    embedding = get_embeddings()
+    vectorstore = get_pinecone_vectorstore(embedding)
+    index_documents(doc_splits, vectorstore)
+    
+    print(f"Successfully ingested {len(doc_splits)} chunks from {os.path.basename(pdf_path)}")
+
+
 def run_ingestion_pipeline() -> None:
     """Run complete ingestion pipeline"""
     embedding = get_embeddings()
