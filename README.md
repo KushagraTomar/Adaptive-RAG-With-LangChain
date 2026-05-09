@@ -76,13 +76,13 @@ uvicorn app.main:app --reload
 
 ## Technology Used
 
-1.python
-2.fast-api
-3.rag
-4.pinecone vectordb
-5.llm
-6.langchain
-7.langgraph
-8.hybrid reterver
-9.cohere reranker
-10.reactjs
+1. python
+2. fast-api
+3. rag
+4. pinecone vectordb
+5. llm
+6. langchain
+7. langgraph
+8. hybrid reterver
+9. cohere reranker
+10. reactjs
