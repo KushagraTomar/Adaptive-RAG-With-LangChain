@@ -207,13 +207,9 @@ def answer_question(question: str) -> str:
     return result["answer"]
 
 
-def get_answer(question: str) -> str:
-    """Wrapper function for API compatibility"""
-    return answer_question(question)
-
-
 if __name__ == "__main__":
-    user_question = "What is the transformer architecture?"
-    answer = answer_question(user_question)
-    print("\nAnswer:\n")
-    print(answer)
+    # user_question = "What is the transformer architecture?"
+    # answer = answer_question(user_question)
+    # print("\nAnswer:\n")
+    # print(answer)
+    pass
