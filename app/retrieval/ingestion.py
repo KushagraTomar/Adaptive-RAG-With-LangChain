@@ -187,13 +187,14 @@ def ingest_pdf(pdf_path: str) -> None:
     print(f"Successfully ingested {len(doc_splits)} chunks from {os.path.basename(pdf_path)}")
 
 
-def run_ingestion_pipeline() -> None:
-    """Run complete ingestion pipeline"""
-    embedding = get_embeddings()
-    doc_splits = load_and_chunk_documents()
-    vectorstore = get_pinecone_vectorstore(embedding)
-    index_documents(doc_splits, vectorstore)
+# def run_ingestion_pipeline() -> None:
+#     """Run complete ingestion pipeline"""
+#     embedding = get_embeddings()
+#     doc_splits = load_and_chunk_documents()
+#     vectorstore = get_pinecone_vectorstore(embedding)
+#     index_documents(doc_splits, vectorstore)
 
 
 if __name__ == "__main__":
-    run_ingestion_pipeline()
+    # run_ingestion_pipeline()
+    pass
