@@ -76,10 +76,8 @@ uvicorn app.main:app --reload
 
 ## Technology Used
 
-| Backend | Retrieval | Frontend | Data | DevOps | Caching |
-|---------|-----------|----------|------|--------|---------|
 | Python | Pinecone | React.js | PostgreSQL | Docker | Redis |
 | FastAPI | Cohere | Vite | Pinecone | K8s | |
-| LangChain | Hybrid Retriever | Axios | | | |
-| LangGraph | Tavily Search | | | | |
+| LangChain | Hybrid Retriever | Axios | Docker | | |
+| LangGraph | Tavily Search | | Redis | | |
 | Mistral AI | | | | | |
