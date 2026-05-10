@@ -76,28 +76,10 @@ uvicorn app.main:app --reload
 
 ## Technology Used
 
-### Backend
-- **Python** - Core programming language
-- **FastAPI** - Modern, fast web framework for building APIs
-- **LangChain** - Framework for developing applications with LLMs
-- **LangGraph** - Orchestrating multi-step LLM workflows and agentic systems
-- **Mistral AI** - Large Language Model for answer generation
-
-### Retrieval & Ranking
-- **Pinecone** - Vector database for semantic search and document retrieval
-- **Cohere Reranker** - Re-ranking retrieved documents for improved relevance
-- **Hybrid Retriever** - Combines dense and sparse retrieval strategies
-- **Tavily Search** - Web search integration for real-time information
-
-### Frontend
-- **React.js** - UI library for building interactive user interface
-- **Vite** - Fast frontend build tool and development server
-- **Axios** - HTTP client for API communication
-
-### Data & Storage
-- **PostgreSQL** - Relational database for metadata and user data
-- **Pinecone Vector Store** - Distributed vector database for embeddings
-
-### Evaluation & Quality
-- **Evaluation Framework** - Custom metrics for answer quality assessment
-- **Grading System** - Document relevance and hallucination detection
+| Backend | Retrieval & Ranking | Frontend | Data & Storage | Evaluation & Quality |
+|---------|-------------------|----------|----------------|----------------------|
+| Python | Pinecone | React.js | PostgreSQL | Evaluation Framework |
+| FastAPI | Cohere Reranker | Vite | Pinecone Vector Store | Grading System |
+| LangChain | Hybrid Retriever | Axios | | |
+| LangGraph | Tavily Search | | | |
+| Mistral AI | | | | |
