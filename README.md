@@ -76,10 +76,10 @@ uvicorn app.main:app --reload
 
 ## Technology Used
 
-| Backend | Retrieval & Ranking | Frontend | Data & Storage | Evaluation & Quality |
+| Backend | Retrieval & Ranking | Frontend | Data & Storage | 
 |---------|-------------------|----------|----------------|----------------------|
-| Python | Pinecone | React.js | PostgreSQL | Evaluation Framework |
-| FastAPI | Cohere Reranker | Vite | Pinecone Vector Store | Grading System |
-| LangChain | Hybrid Retriever | Axios | | |
-| LangGraph | Tavily Search | | | |
-| Mistral AI | | | | |
+| Python | Pinecone | React.js | PostgreSQL 
+| FastAPI | Cohere Reranker | Vite | Pinecone Vector Store 
+| LangChain | Hybrid Retriever | Axios | 
+| LangGraph | Tavily Search | | 
+| Mistral AI | | | 
