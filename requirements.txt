@@ -17,3 +17,5 @@ pypdf
 rank-bm25
 pymupdf4llm 
 langchain-tavily
+redis
+aioredis

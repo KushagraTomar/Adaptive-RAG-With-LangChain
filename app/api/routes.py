@@ -3,9 +3,10 @@ import os
 import shutil
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.models.schemas import RAGRequest, RAGResponse
-from app.rag.rag import answer_question
+from app.rag.rag import answer_question, answer_question_with_cache
 from app.utils.logging import setup_logging
 from app.retrieval.ingestion import ingest_pdf
+from app.cache.redis_cache import get_cache
 
 logger = setup_logging(__name__)
 
@@ -26,9 +27,9 @@ async def ask_question_endpoint(request: RAGRequest):
     """Ask a question to the RAG system"""
     try:
         logger.info(f"Received question: {request.question}")
-        answer = answer_question(request.question)
-        logger.info(f"Generated answer for: {request.question}")
-        return RAGResponse(answer=answer, source_type="hybrid")
+        answer, cached = answer_question_with_cache(request.question)
+        logger.info(f"Generated answer for: {request.question} (cached={cached})")
+        return RAGResponse(answer=answer, source_type="hybrid", cached=cached)
     except Exception as e:
         logger.error(f"Error processing question: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -54,6 +55,11 @@ async def upload_pdf(file: UploadFile = File(...)):
         ingest_pdf(temp_path)
         logger.info(f"PDF ingested successfully: {file.filename}")
         
+        # Invalidate cache after new document ingestion
+        cache = get_cache()
+        cache.clear("rag:answer:*")
+        logger.info("Cache invalidated after PDF ingestion")
+        
         # Clean up temporary file
         os.remove(temp_path)
         
@@ -67,3 +73,26 @@ async def upload_pdf(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Error uploading PDF: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error uploading PDF: {str(e)}")
+
+
+@router.get("/cache/stats")
+async def get_cache_stats():
+    """Get cache statistics and performance metrics"""
+    cache = get_cache()
+    stats = cache.get_stats()
+    return {
+        "status": "success",
+        "cache_stats": stats
+    }
+
+
+@router.post("/cache/clear")
+async def clear_cache():
+    """Manually clear the entire cache"""
+    cache = get_cache()
+    cache.clear("rag:answer:*")
+    logger.info("Cache manually cleared via API")
+    return {
+        "status": "success",
+        "message": "Cache cleared successfully"
+    }

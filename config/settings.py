@@ -34,3 +34,14 @@ TAVILY_MAX_RESULTS = 2
 
 # LLM Settings
 LLM_TEMPERATURE = 0.1
+
+# Redis Cache Settings
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+REDIS_TTL = int(os.getenv("REDIS_TTL", 8 * 3600))  # 8 hours in seconds
+REDIS_ENABLED = os.getenv("REDIS_ENABLED", "true").lower() == "true"
+
+# Question Similarity Settings
+SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.85"))
+CACHE_STATS_ENABLED = os.getenv("CACHE_STATS_ENABLED", "true").lower() == "true"

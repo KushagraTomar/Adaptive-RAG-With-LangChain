@@ -1,4 +1,4 @@
-from typing import Any, List, TypedDict
+from typing import Any, List, TypedDict, Tuple
 
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
@@ -13,6 +13,8 @@ from app.retrieval.ingestion import build_retrieval_resources
 from app.rag.graders import DocumentGrader
 from app.rag.rewriter import QueryTransformer
 from app.utils.logging import setup_logging
+from app.cache.redis_cache import get_cache
+from app.cache.question_similarity import get_similarity_matcher
 
 
 logger = setup_logging(__name__)
@@ -181,9 +183,26 @@ def answer_question(question: str) -> str:
     return rag_pipeline.answer(question)
 
 
-if __name__ == "__main__":
-    # user_question = "What is the transformer architecture?"
-    # answer = answer_question(user_question)
-    # print("\nAnswer:\n")
-    # print(answer)
-    pass
+def answer_question_with_cache(question: str) -> Tuple[str, bool]:
+    """Answer a question with caching. Returns (answer, was_cached)"""
+    cache = get_cache()
+    matcher = get_similarity_matcher()
+    
+    # Generate cache key
+    cache_key = matcher.get_cache_key(question)
+    
+    # Check cache first
+    cached_result = cache.get(cache_key)
+    if cached_result:
+        logger.info(f"Cache hit for question: {question}")
+        return cached_result.get("answer", ""), True
+    
+    # Cache miss - generate answer
+    logger.info(f"Cache miss for question: {question}")
+    answer = rag_pipeline.answer(question)
+    
+    # Store in cache
+    cache_data = {"answer": answer}
+    cache.set(cache_key, cache_data)
+    
+    return answer, False
