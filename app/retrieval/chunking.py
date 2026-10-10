@@ -110,11 +110,11 @@ vector_store = PineconeVectorStore.from_documents(
     index_name=index_name
 )
 print("Ingestion complete!")
-# 4. Optional: Quick Test Retrieval (Similarity Search)
-query = "What is the use of Self Attention?"
-docs = vector_store.similarity_search(query, k=2)
+# # 4. Optional: Quick Test Retrieval (Similarity Search)
+# query = "What is the use of Self Attention?"
+# docs = vector_store.similarity_search(query, k=2)
 
-print("\n--- Top Retrieved Chunk Text ---")
-print(docs[0].page_content)
-print("\n--- Preserved Structural Metadata ---")
-print(docs[0].metadata)
+# print("\n--- Top Retrieved Chunk Text ---")
+# print(docs[0].page_content)
+# print("\n--- Preserved Structural Metadata ---")
+# print(docs[0].metadata)
