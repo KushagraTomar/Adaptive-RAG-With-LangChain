@@ -182,3 +182,5 @@ Thumbs.db
 
 # Local files
 *.local
+
+data/
