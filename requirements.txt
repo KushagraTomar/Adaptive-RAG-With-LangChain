@@ -9,6 +9,7 @@ langgraph
 tiktoken
 tavily-python
 langchain-mistralai
+langchain-huggingface
 langchain-cohere
 pinecone
 pydantic

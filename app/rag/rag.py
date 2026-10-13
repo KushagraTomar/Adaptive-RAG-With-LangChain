@@ -3,12 +3,16 @@ from typing import Any, List, TypedDict
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_mistralai import ChatMistralAI
-from langchain_mistralai import MistralAIEmbeddings
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from langchain_pinecone import PineconeVectorStore
 from langgraph.graph import END, START, StateGraph
 
 from app.cache.redis_cache import get_cache
+from app.retrieval.embeddings import (
+    PINECONE_INDEX_NAME,
+    PINECONE_NAMESPACE,
+    get_embeddings,
+)
 
 class RAGState(TypedDict, total=False):
     question: str              # User's question
@@ -41,11 +45,19 @@ class RAGPipeline:
 
     def __init__(self):
         """Initialize RAG pipeline with all dependencies"""
-        self.llm = ChatMistralAI(model='mistral-small-2506', temperature=0.1)
+        self.llm = ChatHuggingFace(
+            llm=HuggingFaceEndpoint(
+                repo_id="Qwen/Qwen2.5-7B-Instruct",
+                task="text-generation",
+                temperature=0.1,
+                do_sample=True,
+                max_new_tokens=512,
+            )
+        )
         self.vector_store = PineconeVectorStore.from_existing_index(
-            index_name='pdf-structured-rag',
-            embedding=MistralAIEmbeddings(),
-            namespace='default',
+            index_name=PINECONE_INDEX_NAME,
+            embedding=get_embeddings(),
+            namespace=PINECONE_NAMESPACE,
         )
         self.rag_workflow = self.build_workflow()
 

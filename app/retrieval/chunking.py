@@ -2,11 +2,16 @@ import os
 from pathlib import Path
 from langchain_pymupdf4llm import PyMuPDF4LLMLoader
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
-from langchain_mistralai import MistralAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 
-from utils import convert_section_headers
+from app.retrieval.embeddings import (
+    PINECONE_INDEX_DIMENSION,
+    PINECONE_INDEX_NAME,
+    PINECONE_NAMESPACE,
+    get_embeddings,
+)
+from app.retrieval.utils import convert_section_headers
 
 # 1. Load the PDF natively as structured Markdown
 # Resolve the repo root relative to this file so it works regardless of where the script is launched from.
@@ -67,13 +72,7 @@ for doc in documents:
             final_chunks.extend(sub_splits)
 
 # 1. Initialize the Embedding Model
-mistral_api_key = os.getenv("MISTRAL_API_KEY")
-if not mistral_api_key:
-    raise ValueError(
-        "Set the MISTRAL_API_KEY environment variable before running this script."
-    )
-
-embeddings = MistralAIEmbeddings(api_key=mistral_api_key)
+embeddings = get_embeddings()
 
 # 2. Setup Pinecone Client
 pinecone_api_key = os.getenv("PINECONE_API_KEY")
@@ -83,14 +82,14 @@ if not pinecone_api_key:
     )
 
 pc = Pinecone(api_key=pinecone_api_key)
-index_name = 'pdf-structured-rag'
+index_name = PINECONE_INDEX_NAME
 
 # Create the index if it doesn't exist yet
 if not pc.has_index(index_name):
     pc.create_index(
         name=index_name,
         vector_type="dense",
-        dimension=1024,
+        dimension=PINECONE_INDEX_DIMENSION,
         metric="cosine",
         spec=ServerlessSpec(
             cloud='aws',
@@ -107,7 +106,8 @@ print("Embedding chunks and uploading to Pinecone...")
 vector_store = PineconeVectorStore.from_documents(
     documents=final_chunks, # The chunks list from your PyMuPDF4LLM step
     embedding=embeddings,
-    index_name=index_name
+    index_name=index_name,
+    namespace=PINECONE_NAMESPACE,
 )
 print("Ingestion complete!")
 # # 4. Optional: Quick Test Retrieval (Similarity Search)

@@ -31,6 +31,7 @@ pip install -r requirements.txt
 2. Set up environment variables:
 ```bash
 export MISTRAL_API_KEY="your-mistral-api-key"
+export HUGGINGFACEHUB_API_TOKEN="your-huggingface-api-token"
 export COHERE_API_KEY="your-cohere-api-key"
 export TAVILY_API_KEY="your-tavily-api-key"
 export PINECONE_API_KEY="your-pinecone-api-key"
@@ -44,9 +45,9 @@ Optional:
 export PINECONE_NAMESPACE="default"
 ```
 
-3. Run the ingestion pipeline to chunk PDFs and index them in Pinecone:
+3. Run the ingestion pipeline to chunk PDFs and index them in Pinecone. It uses the Hugging Face `sentence-transformers/all-MiniLM-L6-v2` embedding model and creates the `pdf-structured-rag-hf` index:
 ```bash
-python -m app.ingestion
+python -m app.retrieval.chunking
 ```
 
 4. Run the FastAPI server:
