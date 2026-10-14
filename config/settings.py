@@ -21,7 +21,7 @@ PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
 PINECONE_REGION = os.getenv("PINECONE_REGION", "us-east-1")
 
 # Model Settings
-MISTRAL_MODEL = "mistral-large-latest"
+MISTRAL_MODEL = "ministral-3b-2512"
 COHERE_RERANK_MODEL = "rerank-english-v3.0"
 
 # Retrieval Settings

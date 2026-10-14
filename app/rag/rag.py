@@ -8,7 +8,11 @@ from langchain_pinecone import PineconeVectorStore
 from langgraph.graph import END, START, StateGraph
 
 # from app.cache.redis_cache import get_cache
-from config.settings import LLM_TEMPERATURE, MISTRAL_API_KEY, MISTRAL_MODEL
+from config.settings import (
+    LLM_TEMPERATURE, 
+    MISTRAL_API_KEY, 
+    MISTRAL_MODEL
+)
 from app.retrieval.embeddings import (
     PINECONE_INDEX_NAME,
     PINECONE_NAMESPACE,

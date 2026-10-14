@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from langchain_mistralai import MistralAIEmbeddings
 from langchain_pymupdf4llm import PyMuPDF4LLMLoader
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from langchain_pinecone import PineconeVectorStore
@@ -12,6 +13,14 @@ from app.retrieval.embeddings import (
     get_embeddings,
 )
 from app.retrieval.utils import convert_section_headers
+
+EMBEDDING_MODEL = "mistral-embed"
+PINECONE_INDEX_NAME = "pdf-structured-rag-mistral"
+PINECONE_INDEX_DIMENSION = 1024
+PINECONE_NAMESPACE = "default"
+
+def get_embeddings() -> MistralAIEmbeddings:
+    return MistralAIEmbeddings(model=EMBEDDING_MODEL)
 
 # 1. Load the PDF natively as structured Markdown
 # Resolve the repo root relative to this file so it works regardless of where the script is launched from.
@@ -110,11 +119,3 @@ vector_store = PineconeVectorStore.from_documents(
     namespace=PINECONE_NAMESPACE,
 )
 print("Ingestion complete!")
-# # 4. Optional: Quick Test Retrieval (Similarity Search)
-# query = "What is the use of Self Attention?"
-# docs = vector_store.similarity_search(query, k=2)
-
-# print("\n--- Top Retrieved Chunk Text ---")
-# print(docs[0].page_content)
-# print("\n--- Preserved Structural Metadata ---")
-# print(docs[0].metadata)
