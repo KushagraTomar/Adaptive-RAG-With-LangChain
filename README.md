@@ -28,14 +28,14 @@ npm run dev
 pip install -r requirements.txt
 ```
 
+Use Python 3.10 or newer.
+
 2. Set up environment variables:
 ```bash
 export MISTRAL_API_KEY="your-mistral-api-key"
-export HUGGINGFACEHUB_API_TOKEN="your-huggingface-api-token"
 export COHERE_API_KEY="your-cohere-api-key"
 export TAVILY_API_KEY="your-tavily-api-key"
 export PINECONE_API_KEY="your-pinecone-api-key"
-export PINECONE_INDEX_NAME="adaptive-rag"
 export PINECONE_CLOUD="aws"
 export PINECONE_REGION="us-east-1"
 ```
@@ -45,15 +45,22 @@ Optional:
 export PINECONE_NAMESPACE="default"
 ```
 
-3. Run the ingestion pipeline to chunk PDFs and index them in Pinecone. It uses the Hugging Face `sentence-transformers/all-MiniLM-L6-v2` embedding model and creates the `pdf-structured-rag-hf` index:
+3. Run the ingestion pipeline to chunk PDFs and index them in Pinecone. It uses Mistral's `mistral-embed` embedding model and creates the `pdf-structured-rag-mistral` index. Re-run ingestion after changing embedding models:
 ```bash
 python -m app.retrieval.chunking
 ```
 
-4. Run the FastAPI server:
+4. Start the RAG pipeline. It uses Mistral's `mistral-large-latest` chat model:
+```bash
+python -m app.rag.rag
+```
+
+5. Run the FastAPI server:
 ```bash
 uvicorn app.main:app --reload
 ```
+
+Mistral inference and Pinecone are hosted services, so `MISTRAL_API_KEY`, `PINECONE_API_KEY`, and an internet connection are required.
 
 ## API Endpoints
 

@@ -3,11 +3,12 @@ from typing import Any, List, TypedDict
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+from langchain_mistralai import ChatMistralAI
 from langchain_pinecone import PineconeVectorStore
 from langgraph.graph import END, START, StateGraph
 
-from app.cache.redis_cache import get_cache
+# from app.cache.redis_cache import get_cache
+from config.settings import LLM_TEMPERATURE, MISTRAL_API_KEY, MISTRAL_MODEL
 from app.retrieval.embeddings import (
     PINECONE_INDEX_NAME,
     PINECONE_NAMESPACE,
@@ -45,14 +46,11 @@ class RAGPipeline:
 
     def __init__(self):
         """Initialize RAG pipeline with all dependencies"""
-        self.llm = ChatHuggingFace(
-            llm=HuggingFaceEndpoint(
-                repo_id="Qwen/Qwen2.5-7B-Instruct",
-                task="text-generation",
-                temperature=0.1,
-                do_sample=True,
-                max_new_tokens=512,
-            )
+        self.llm = ChatMistralAI(
+            model=MISTRAL_MODEL,
+            temperature=LLM_TEMPERATURE,
+            max_tokens=512,
+            api_key=MISTRAL_API_KEY,
         )
         self.vector_store = PineconeVectorStore.from_existing_index(
             index_name=PINECONE_INDEX_NAME,

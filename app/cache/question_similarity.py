@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import numpy as np
 from langchain_mistralai import MistralAIEmbeddings
 from config.settings import SIMILARITY_THRESHOLD, MISTRAL_API_KEY
+from app.retrieval.embeddings import EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,10 @@ class QuestionSimilarityMatcher:
     def __init__(self):
         """Initialize embeddings model"""
         try:
-            self.embeddings = MistralAIEmbeddings(api_key=MISTRAL_API_KEY)
+            self.embeddings = MistralAIEmbeddings(
+                model=EMBEDDING_MODEL,
+                api_key=MISTRAL_API_KEY,
+            )
             logger.info("Question similarity matcher initialized with Mistral embeddings")
         except Exception as e:
             logger.error(f"Failed to initialize embeddings: {str(e)}")
