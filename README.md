@@ -1,4 +1,4 @@
-# RAG Based Research Assistant LangChain and FastAPI
+# RAG Based Research Assistant using LangChain
 
 
 This project implements an Adaptive Retrieval-Augmented Generation (RAG) system using LangChain and exposes it through a FastAPI backend.
